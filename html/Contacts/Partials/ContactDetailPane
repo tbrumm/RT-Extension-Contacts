@@ -38,6 +38,28 @@ my $can_admin  = $current_user->HasRight( Right => 'AdminContacts',          Obj
 
 my $web_path = RT->Config->Get('WebPath');
 
+# Avatar fallback chain
+use Digest::MD5 qw(md5_hex);
+my $has_rt_image = $user->ImageContentType ? 1 : 0;
+my $email_hash   = md5_hex(lc($user->EmailAddress // ''));
+my $gravatar_url = "https://www.gravatar.com/avatar/${email_hash}?s=120&d=404";
+
+my $display_name = $user->RealName || $user->Name || '';
+my @name_words   = split /\s+/, $display_name;
+my $initials     = '';
+$initials .= uc(substr($name_words[0],  0, 1)) if @name_words >= 1;
+$initials .= uc(substr($name_words[-1], 0, 1)) if @name_words >= 2;
+$initials ||= '?';
+
+my $hue = 0;
+$hue = ($hue * 31 + ord($_)) % 360 for split //, $display_name;
+my $avatar_color = "hsl($hue,55%,45%)";
+
+my $avatar_src  = $has_rt_image
+    ? "$web_path/Helpers/UserImage/" . $user->Id . '-' . $user->ImageSignature
+    : $gravatar_url;
+my $avatar_step = $has_rt_image ? 'rt' : 'gravatar';
+
 # Geocode address via Nominatim
 my ($map_lat, $map_lon);
 if (@addr_lines) {
@@ -80,10 +102,17 @@ if (@addr_lines) {
 
       <!-- Header: Avatar + Name + Actions -->
       <div class="d-flex align-items-start mb-3">
-        <img src="<% RT->Config->Get('WebPath') %>/Helpers/UserImage/<% $user->Id %>-<% $user->ImageSignature %>"
+        <img src="<% $avatar_src %>"
+             data-gravatar="<% $gravatar_url %>"
+             data-initials="<% $initials %>"
+             data-color="<% $avatar_color %>"
+             data-step="<% $avatar_step %>"
+             data-size="60"
+             data-margin="1rem"
+             onerror="contactAvatarFallback(this)"
              class="rounded-circle me-3 flex-shrink-0"
              style="width:60px;height:60px;object-fit:cover;"
-             alt="<% uc(substr($user->RealName || $user->Name, 0, 1)) %>">
+             alt="<% $initials %>">
         <div class="flex-grow-1">
           <h5 class="mb-1"><% $user->RealName || $user->Name %></h5>
           <div class="text-muted small"><% $user->EmailAddress %></div>

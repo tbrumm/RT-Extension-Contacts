@@ -11,7 +11,7 @@ my $tools = $top->child('tools');
 if ($tools) {
     $tools->child(
         'contacts',
-        title      => loc('Contacts'),
+        title      => loc('My Contacts'),
         path       => RT->Config->Get('WebPath') . '/Contacts/',
         sort_order => 90,
     );

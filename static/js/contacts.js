@@ -34,6 +34,27 @@
         });
     }
 
+    // Avatar fallback: RT image → Gravatar → initials div
+    window.contactAvatarFallback = function (img) {
+        if (img.dataset.step === 'rt') {
+            img.dataset.step = 'gravatar';
+            img.src = img.dataset.gravatar;
+        } else {
+            var size   = parseInt(img.dataset.size || '40');
+            var margin = img.dataset.margin || '0';
+            var fs     = Math.round(size * 0.37);
+            var div    = document.createElement('div');
+            div.setAttribute('style',
+                'width:' + size + 'px;height:' + size + 'px;border-radius:50%;flex-shrink:0;' +
+                'margin-right:' + margin + ';' +
+                'background:' + (img.dataset.color || '#6c757d') + ';' +
+                'display:flex;align-items:center;justify-content:center;' +
+                'color:#fff;font-weight:700;font-size:' + fs + 'px;letter-spacing:.02em;');
+            div.textContent = img.dataset.initials || '?';
+            img.parentNode.replaceChild(div, img);
+        }
+    };
+
     // Re-run after HTMX swaps new content
     document.body.addEventListener('htmx:afterSwap', function () {
         colorizeAvatars();

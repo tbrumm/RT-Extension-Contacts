@@ -6,6 +6,7 @@ $page    => 0
 </%ARGS>
 <%INIT>
 use RT::Extension::Contacts;
+use Digest::MD5 qw(md5_hex);
 
 my $current_user = $session{CurrentUser};
 unless ( $current_user && $current_user->id ) {
@@ -18,7 +19,7 @@ unless ( $current_user->HasRight( Right => 'SeeContacts', Object => RT->System )
 }
 
 my @contacts;
-my $more = 0;
+my $total_count = 0;
 my $PER_PAGE = 50;
 
 if ( $filter eq 'personal' ) {
@@ -45,12 +46,12 @@ if ( $filter eq 'personal' ) {
 } else {
     # all
     my $users = RT::Extension::Contacts->GetAllContacts( $PER_PAGE, $page * $PER_PAGE );
-    my $count = 0;
     while ( my $u = $users->Next ) {
         push @contacts, { user => $u, notes => '', marking => '' };
-        $count++;
     }
-    $more = ( $count == $PER_PAGE );
+    my $cu = RT::Users->new( RT->SystemUser );
+    $cu->LimitToEnabled();
+    $total_count = $cu->Count;
 }
 </%INIT>
 <div id="contacts-list-content">
@@ -63,6 +64,21 @@ if ( $filter eq 'personal' ) {
 % for my $c (@contacts) {
 %   my $u = $c->{user};
 %   my $is_personal = RT::Extension::Contacts->IsPersonalContact( $u->Id, $current_user->id );
+%   my $has_rt_image  = $u->ImageContentType ? 1 : 0;
+%   my $email_hash    = md5_hex(lc($u->EmailAddress // ''));
+%   my $gravatar_url  = "https://www.gravatar.com/avatar/${email_hash}?s=72&d=404";
+%   my $display_name  = $u->RealName || $u->Name || '';
+%   my @nw = split /\s+/, $display_name;
+%   my $initials = '';
+%   $initials .= uc(substr($nw[0],  0, 1)) if @nw >= 1;
+%   $initials .= uc(substr($nw[-1], 0, 1)) if @nw >= 2;
+%   $initials ||= '?';
+%   my $hue = 0; $hue = ($hue * 31 + ord($_)) % 360 for split //, $display_name;
+%   my $avatar_color = "hsl($hue,55%,45%)";
+%   my $avatar_src   = $has_rt_image
+%       ? RT->Config->Get('WebPath') . '/Helpers/UserImage/' . $u->Id . '-' . $u->ImageSignature
+%       : $gravatar_url;
+%   my $avatar_step  = $has_rt_image ? 'rt' : 'gravatar';
 <div class="contact-card d-flex align-items-center px-2 py-2 border-bottom contacts-list-item"
      style="cursor:pointer;"
      hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ContactDetailPane?user_id=<% $u->Id %>"
@@ -71,10 +87,16 @@ if ( $filter eq 'personal' ) {
      hx-swap="innerHTML"
      hx-push-url="false">
   <div class="contact-avatar me-2 flex-shrink-0">
-    <img src="<% RT->Config->Get('WebPath') %>/Helpers/UserImage/<% $u->Id %>-<% $u->ImageSignature %>"
+    <img src="<% $avatar_src %>"
+         data-gravatar="<% $gravatar_url %>"
+         data-initials="<% $initials %>"
+         data-color="<% $avatar_color %>"
+         data-step="<% $avatar_step %>"
+         data-size="36"
+         onerror="contactAvatarFallback(this)"
          class="rounded-circle"
          style="width:36px;height:36px;object-fit:cover;"
-         alt="<% uc(substr($u->RealName || $u->Name, 0, 1)) %>">
+         alt="<% $initials %>">
   </div>
   <div class="contact-info flex-grow-1 overflow-hidden">
     <div class="fw-semibold text-truncate" style="font-size:.9rem;">
@@ -98,15 +120,29 @@ if ( $filter eq 'personal' ) {
   </div>
 </div>
 % }
-% if ($more) {
-<div class="text-center p-2">
-  <button class="btn btn-sm btn-outline-secondary"
-          hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ContactListPane?filter=<% $filter %>&page=<% $page + 1 %>"
+% if ($filter eq 'all' && $total_count > $PER_PAGE) {
+%   my $last_page = int(($total_count - 1) / $PER_PAGE);
+%   my %show;
+%   for my $p (0, 1, $last_page - 1, $last_page, ($page - 2) .. ($page + 2)) {
+%     $show{$p} = 1 if $p >= 0 && $p <= $last_page;
+%   }
+%   my @pages = sort { $a <=> $b } keys %show;
+<div class="d-flex flex-wrap gap-1 p-2 justify-content-center border-top">
+%   my $prev = -2;
+%   for my $p (@pages) {
+%     if ($p > $prev + 1) {
+  <span class="btn btn-sm disabled px-1" style="pointer-events:none;">...</span>
+%     }
+  <button class="btn btn-sm <% $p == $page ? 'btn-primary' : 'btn-outline-secondary' %>"
+          style="min-width:2.2rem;"
+          hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ContactListPane?filter=all&page=<% $p %>"
           hx-target="#contacts-list-pane"
           hx-select="#contacts-list-content"
           hx-swap="innerHTML">
-    <% loc('Load more…') %>
+    <% $p + 1 %>
   </button>
+%     $prev = $p;
+%   }
 </div>
 % }
 </div><!-- /contacts-list-content -->
