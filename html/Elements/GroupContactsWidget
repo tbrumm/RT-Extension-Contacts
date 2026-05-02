@@ -1,0 +1,94 @@
+<& /Widgets/TitleBoxStart, title => loc("Group Contacts"), class => 'group-contacts-widget', bodyclass => 'p-0' &>
+
+% unless ($can_see) {
+<div class="text-center text-body-secondary py-3 small px-3">
+  <&|/l&>You don't have permission to view contacts.</&>
+</div>
+% } elsif (!@$contacts) {
+<div class="text-center text-body-secondary py-3 small px-3">
+  <&|/l&>No group contacts yet.</&>
+</div>
+% } else {
+<div class="list-group list-group-flush">
+% for my $c (@$contacts) {
+%   my $u = RT::User->new(RT->SystemUser);
+%   $u->Load($c->{user_id});
+%   next unless $u->Id;
+%   my $img = $web_path . '/Helpers/UserImage/' . $u->Id . '-' . $u->ImageSignature;
+%   my @meta;
+%   push @meta, $u->Organization if $u->Organization;
+%   push @meta, $u->WorkPhone    if $u->WorkPhone;
+%   push @meta, $u->MobilePhone  if $u->MobilePhone;
+%   my @aparts; push @aparts, $u->City if $u->City; push @aparts, $u->Country if $u->Country;
+%   push @meta, join(', ', @aparts) if @aparts;
+  <div class="list-group-item px-3 py-1">
+    <div class="d-flex align-items-center gap-2">
+      <img src="<% $img |h %>" class="rounded-circle flex-shrink-0"
+           style="width:28px;height:28px;object-fit:cover;" alt="">
+      <div class="flex-grow-1 overflow-hidden">
+        <div class="d-flex align-items-baseline justify-content-between gap-2">
+          <a href="<% $web_path %>/Contacts/?user_id=<% $u->Id %>" class="fw-semibold text-body text-decoration-none text-truncate"
+             style="font-size:.85rem;"><% $u->RealName || $u->Name |h %></a>
+          <span class="badge text-bg-secondary flex-shrink-0" style="font-size:.65rem;">
+            <% $c->{group_name} |h %>
+          </span>
+        </div>
+%   if ($u->EmailAddress) {
+        <div class="text-truncate" style="font-size:.75rem;">
+          <a href="mailto:<% $u->EmailAddress |h %>" class="text-body-secondary"><% $u->EmailAddress |h %></a>
+        </div>
+%   }
+%   if (@meta) {
+        <div class="text-body-secondary text-truncate" style="font-size:.75rem;">
+%     my $sep = 0;
+%     for my $item (@meta) {
+%       $m->out(' &middot; ') if $sep++;
+          <% $item |h %>
+%     }
+        </div>
+%   }
+      </div>
+    </div>
+  </div>
+% }
+</div>
+% }
+<div class="px-3 py-2 border-top d-flex justify-content-between">
+  <a href="<% $web_path %>/Contacts/" class="small text-body-secondary">
+    <&|/l&>Open Contacts</&> &rsaquo;
+  </a>
+  <a href="<% $web_path %>/Contacts/Manage.html" class="small text-body-secondary">
+    <&|/l&>Manage Contacts</&> (<% $total %>) &rsaquo;
+  </a>
+</div>
+
+<& /Widgets/TitleBoxEnd &>
+
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+my $can_see = $current_user->HasRight(Right => 'SeeContacts', Object => RT->System);
+my $web_path = RT->Config->Get('WebPath');
+
+my ($contacts, $total) = ([], 0);
+if ($can_see) {
+    my $user_groups = RT::Extension::Contacts->GetUserGroups($current_user->id);
+    my @group_ids   = map { $_->{id} } @$user_groups;
+    if (@group_ids) {
+        my $dbh   = $RT::Handle->dbh;
+        my $ph    = join(',', ('?') x @group_ids);
+        $contacts = $dbh->selectall_arrayref(qq{
+            SELECT cm.user_id, cm.notes, g.Name AS group_name
+            FROM contact_markings cm
+            JOIN Groups g ON g.id = cm.group_id
+            WHERE cm.marking_type = 'group' AND cm.group_id IN ($ph)
+            ORDER BY cm.created DESC LIMIT 5
+        }, {Slice => {}}, @group_ids) // [];
+        ($total) = $dbh->selectrow_array(qq{
+            SELECT COUNT(*) FROM contact_markings
+            WHERE marking_type = 'group' AND group_id IN ($ph)
+        }, undef, @group_ids);
+    }
+}
+</%INIT>

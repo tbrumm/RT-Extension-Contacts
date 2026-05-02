@@ -1,3 +1,9 @@
+1.1.0 2026-05-02
+    - Added PersonalContactsWidget: dashboard widget showing personal contacts with avatar,
+      name, email, organization, phone, mobile and city/country
+    - Added GroupContactsWidget: dashboard widget showing group contacts grouped by group name
+    - Both widgets require SeeContacts right; show empty-state message when no contacts exist
+
 1.0.0 2026-05-02
     - Initial release
     - Three-column contacts page (Tools menu) with live HTMX search and filters

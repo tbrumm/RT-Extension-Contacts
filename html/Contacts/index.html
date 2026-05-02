@@ -112,17 +112,33 @@
     <div class="card-header fw-semibold py-2">
       <i class="bi bi-person-vcard me-1"></i><% loc('Contact Details') %>
     </div>
-    <div id="contacts-detail-pane" class="card-body p-0">
+    <div id="contacts-detail-pane" class="card-body p-0"
+% if ($user_id) {
+         hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ContactDetailPane?user_id=<% $user_id %>"
+         hx-trigger="load"
+         hx-select="#contacts-detail-content"
+         hx-swap="innerHTML"
+% }
+    >
+% if ($user_id) {
+      <div class="text-center text-muted p-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+      </div>
+% } else {
       <div class="text-center text-muted py-5">
         <i class="bi bi-person-circle" style="font-size: 3rem; opacity:.3;"></i>
         <p class="mt-2"><% loc('Select a contact to view details') %></p>
       </div>
+% }
     </div>
   </div><!-- /right pane -->
 
 </div><!-- /contacts-page -->
 
 <& /Elements/Footer &>
+<%ARGS>
+$user_id => 0
+</%ARGS>
 <%INIT>
 use RT::Extension::Contacts;
 

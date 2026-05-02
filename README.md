@@ -28,6 +28,12 @@ When a search returns no match, an inline form opens directly in the page — no
 
 ![Add Personal Contact](images/AddPersonalContact.png)
 
+### Dashboard Widgets
+
+`PersonalContactsWidget` and `GroupContactsWidget` on an RT dashboard — each shows the 5 most recently added contacts with avatar, name, email, organization, phone, mobile and city/country. The group widget adds a group badge per entry. Both widgets link directly to the Contacts page with the selected contact pre-loaded, and provide footer links to Open Contacts and Manage Contacts.
+
+![Dashboard Widgets](images/DashboardWidget.png)
+
 ---
 
 ## Features
@@ -45,6 +51,7 @@ When a search returns no match, an inline form opens directly in the page — no
 - **CSV import**: bulk-import contacts from CSV file
 - **Bootstrap 5.3 / dark-mode aware**: uses `var(--bs-*)` CSS variables throughout, `[data-bs-theme=dark]` overrides for dark mode
 - **RT user images**: profile photos via RT's native `/Helpers/UserImage/` endpoint
+- **Dashboard widgets**: `PersonalContactsWidget` and `GroupContactsWidget` for RT dashboards — show name, email, organization, phone, mobile and city/country per contact
 
 ---
 
@@ -72,7 +79,17 @@ rsync -av RT-Extension-Contacts/ /opt/rt6/local/plugins/RT-Extension-Contacts/
 Plugin('RT::Extension::Contacts');
 ```
 
-### 3. Clear Mason cache and restart the web server
+### 3. Add dashboard widgets to `HomepageComponents`
+
+To make `PersonalContactsWidget` and `GroupContactsWidget` available in the dashboard editor, append them to the `$HomepageComponents` list (e.g. in `RT_SiteConfig.d/003_HomePage.pm`):
+
+```perl
+Set($HomepageComponents, [qw(
+    ... PersonalContactsWidget GroupContactsWidget
+)]);
+```
+
+### 4. Clear Mason cache and restart the web server
 
 ```bash
 sudo systemctl stop apache2
@@ -163,6 +180,10 @@ RT-Extension-Contacts/
 │   │       └── Elements/Header/
 │   │           └── PrivilegedMainNav  # Injects menu items (Tools + user dropdown)
 │   │
+│   ├── Elements/
+│   │   ├── PersonalContactsWidget   # Dashboard widget: personal contacts list
+│   │   └── GroupContactsWidget      # Dashboard widget: group contacts by group
+│   │
 │   └── Contacts/
 │       ├── index.html               # Main contacts page (3-column layout)
 │       ├── Manage.html              # Manage Contacts page
@@ -231,6 +252,19 @@ The `PrivilegedMainNav` callback injects two menu items:
 
 - **Tools → Contacts** (`/Contacts/`) — visible to users with `SeeContacts`
 - **User menu → Manage Contacts** (`/Contacts/Manage.html`) — visible to users with `SeeContacts`
+
+---
+
+## Dashboard Widgets
+
+Two widgets are available for RT dashboards (Admin → Dashboards → Edit):
+
+| Widget | Description |
+|--------|-------------|
+| `PersonalContactsWidget` | Lists the current user's personal contacts with avatar, name, email, organization, phone, mobile, and city/country |
+| `GroupContactsWidget` | Lists contacts from all RT groups the current user belongs to, grouped by group name, with the same contact fields |
+
+Both widgets require the `SeeContacts` right and show an appropriate message if the right is missing or no contacts exist. Clicking a contact name opens the Contacts page.
 
 ---
 
