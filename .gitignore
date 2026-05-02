@@ -1,0 +1,35 @@
+# ── Perl / RT Extension build artefacts ───────────────────────────────────────
+inc/
+blib/
+pm_to_blib
+Makefile
+MANIFEST
+MANIFEST.SKIP
+META.yml
+META.json
+*.bak
+*.orig
+
+# ── Apple / macOS ──────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+.AppleDouble
+.LSOverride
+*.icloud
+.fseventsd
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+
+# ── Claude Code / Anthropic ────────────────────────────────────────────────────
+.claude/
+CLAUDE.md
+.claudeignore
+*.jsonl
