@@ -28,6 +28,12 @@ When a search returns no match, an inline form opens directly in the page — no
 
 ![Add Personal Contact](images/AddPersonalContact.png)
 
+### Contact Detail with OpenStreetMap
+
+The contact detail pane uses a two-column layout: contact info and markings on the left, and an embedded OpenStreetMap on the right. The map is geocoded server-side via the Nominatim API from the contact's stored address and shows a location marker. A "View larger map" link opens OpenStreetMap directly.
+
+![Contact Details with Map](images/ContactDetailsMaps.png)
+
 ### Dashboard Widgets
 
 `PersonalContactsWidget` and `GroupContactsWidget` on an RT dashboard — each shows the 5 most recently added contacts with avatar, name, email, organization, phone, mobile and city/country. The group widget adds a group badge per entry. Both widgets link directly to the Contacts page with the selected contact pre-loaded, and provide footer links to Open Contacts and Manage Contacts.
@@ -51,6 +57,7 @@ When a search returns no match, an inline form opens directly in the page — no
 - **CSV import**: bulk-import contacts from CSV file
 - **Bootstrap 5.3 / dark-mode aware**: uses `var(--bs-*)` CSS variables throughout, `[data-bs-theme=dark]` overrides for dark mode
 - **RT user images**: profile photos via RT's native `/Helpers/UserImage/` endpoint
+- **OpenStreetMap integration**: contact detail pane geocodes the stored address via Nominatim and embeds a live OSM map with location marker
 - **Dashboard widgets**: `PersonalContactsWidget` and `GroupContactsWidget` for RT dashboards — show name, email, organization, phone, mobile and city/country per contact
 
 ---
