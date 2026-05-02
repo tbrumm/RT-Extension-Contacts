@@ -1,0 +1,135 @@
+<& /Elements/Header, Title => loc('Contacts') &>
+<& /Elements/Tabs &>
+
+<div class="contacts-page d-flex gap-3 mt-3">
+
+  <!-- LEFT: Contact Groups (20%) -->
+  <div class="contacts-left-pane" style="width:20%; min-width:180px; flex-shrink:0;">
+
+    <!-- Widget 1: Contact Search -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header fw-semibold py-2">
+        <i class="bi bi-search me-1"></i><% loc('Contact Search') %>
+      </div>
+      <div class="card-body p-2">
+        <input type="text"
+               id="contact-search-input"
+               class="form-control form-control-sm"
+               placeholder="<% loc('Name, email, phone...') %>"
+               hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ContactListPane"
+               hx-trigger="keyup changed delay:400ms"
+               hx-target="#contacts-list-pane"
+               hx-select="#contacts-list-content"
+               hx-swap="innerHTML"
+               hx-include="[name='filter']"
+               name="q"
+               autocomplete="off">
+        <input type="hidden" name="filter" value="search">
+      </div>
+    </div>
+
+    <!-- Widget 2: Personal Contacts -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header fw-semibold py-2">
+        <i class="bi bi-person-heart me-1"></i><% loc('Personal Contacts') %>
+      </div>
+      <div class="card-body p-2">
+        <a href="#"
+           class="btn btn-sm btn-outline-primary w-100 text-start contacts-filter-link active"
+           hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ContactListPane?filter=personal"
+           hx-target="#contacts-list-pane"
+           hx-select="#contacts-list-content"
+           hx-swap="innerHTML"
+           hx-push-url="false">
+          <% loc('My Personal Contacts') %>
+        </a>
+      </div>
+    </div>
+
+    <!-- Widget 3: Group Contacts -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header fw-semibold py-2">
+        <i class="bi bi-people me-1"></i><% loc('Group Contacts') %>
+      </div>
+      <div class="card-body p-2">
+% for my $g (@$user_groups) {
+        <a href="#"
+           class="btn btn-sm btn-outline-secondary w-100 text-start mb-1 contacts-filter-link"
+           hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ContactListPane?filter=group&group_id=<% $g->{id} %>"
+           hx-target="#contacts-list-pane"
+           hx-select="#contacts-list-content"
+           hx-swap="innerHTML"
+           hx-push-url="false">
+          <% $g->{name} %>
+        </a>
+% }
+% unless (@$user_groups) {
+        <span class="text-muted small"><% loc('No groups') %></span>
+% }
+      </div>
+    </div>
+
+    <!-- Widget 4: All Contacts -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header fw-semibold py-2">
+        <i class="bi bi-person-lines-fill me-1"></i><% loc('All Contacts') %>
+      </div>
+      <div class="card-body p-2">
+        <a href="#"
+           class="btn btn-sm btn-outline-secondary w-100 text-start contacts-filter-link"
+           hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ContactListPane?filter=all"
+           hx-target="#contacts-list-pane"
+           hx-select="#contacts-list-content"
+           hx-swap="innerHTML"
+           hx-push-url="false">
+          <% loc('All RT Users') %>
+        </a>
+      </div>
+    </div>
+
+  </div><!-- /left pane -->
+
+  <!-- MIDDLE: Contacts (30%) -->
+  <div class="contacts-list-pane card shadow-sm" style="width:30%; min-width:220px; flex-shrink:0;">
+    <div class="card-header fw-semibold py-2">
+      <i class="bi bi-card-list me-1"></i><% loc('Contacts') %>
+    </div>
+    <div id="contacts-list-pane"
+         class="card-body p-0"
+         hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ContactListPane?filter=personal"
+         hx-trigger="load"
+         hx-select="#contacts-list-content"
+         hx-swap="innerHTML">
+      <div class="text-center text-muted p-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="ms-2"><% loc('Loading...') %></span>
+      </div>
+    </div>
+  </div><!-- /middle pane -->
+
+  <!-- RIGHT: Contact Details (50%) -->
+  <div class="contacts-detail-pane card shadow-sm flex-grow-1">
+    <div class="card-header fw-semibold py-2">
+      <i class="bi bi-person-vcard me-1"></i><% loc('Contact Details') %>
+    </div>
+    <div id="contacts-detail-pane" class="card-body p-0">
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-person-circle" style="font-size: 3rem; opacity:.3;"></i>
+        <p class="mt-2"><% loc('Select a contact to view details') %></p>
+      </div>
+    </div>
+  </div><!-- /right pane -->
+
+</div><!-- /contacts-page -->
+
+<& /Elements/Footer &>
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+unless ( $current_user && $current_user->HasRight( Right => 'SeeContacts', Object => RT->System ) ) {
+    Abort( loc('Permission denied.') );
+}
+
+my $user_groups = RT::Extension::Contacts->GetUserGroups( $current_user->id );
+</%INIT>

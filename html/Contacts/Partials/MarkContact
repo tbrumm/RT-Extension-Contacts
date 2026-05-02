@@ -1,0 +1,69 @@
+<%ARGS>
+$user_id      => 0
+$marking_type => 'personal'
+$group_id     => 0
+$action       => 'add'
+$notes        => ''
+$context      => 'detail'
+$q            => ''
+</%ARGS>
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+unless ( $current_user && $current_user->id ) {
+    $r->status(403); $m->abort();
+}
+
+# CSRF is validated by RT's autohandler via Referer header check
+
+# Permission check
+if ( $marking_type eq 'personal' ) {
+    unless ( $current_user->HasRight( Right => 'ManagePersonalContacts', Object => RT->System )
+          || $current_user->HasRight( Right => 'AdminContacts',          Object => RT->System ) ) {
+        $r->status(403); $m->abort();
+    }
+} elsif ( $marking_type eq 'group' ) {
+    unless ( $current_user->HasRight( Right => 'ManageGroupContacts', Object => RT->System )
+          || $current_user->HasRight( Right => 'AdminContacts',       Object => RT->System ) ) {
+        $r->status(403); $m->abort();
+    }
+}
+
+if ( $action eq 'add' ) {
+    if ( $marking_type eq 'personal' ) {
+        RT::Extension::Contacts->AddPersonalContact( $user_id, $current_user->id, $notes );
+    } elsif ( $marking_type eq 'group' && $group_id ) {
+        RT::Extension::Contacts->AddGroupContact( $user_id, $group_id, $current_user->id, $notes );
+    }
+} elsif ( $action eq 'remove' ) {
+    if ( $marking_type eq 'personal' ) {
+        RT::Extension::Contacts->RemovePersonalContact( $user_id, $current_user->id );
+    } elsif ( $marking_type eq 'group' && $group_id ) {
+        RT::Extension::Contacts->RemoveGroupContact( $user_id, $group_id );
+    }
+} elsif ( $action eq 'notes' ) {
+    # Update notes on existing personal contact
+    my $dbh = $RT::Handle->dbh;
+    my $now  = RT::Extension::Contacts::_Now();
+    $dbh->do(q{
+        UPDATE contact_markings SET notes = ?, last_updated = ?
+        WHERE user_id = ? AND marked_by = ? AND marking_type = 'personal'
+    }, undef, $notes, $now, $user_id, $current_user->id );
+}
+
+# If called from the Manage page (remove from table row), return empty to trigger row removal
+if ( $context eq 'manage' && $action eq 'remove' ) {
+    $m->out(''); $m->abort();
+}
+
+# If called from the Manage page search (add), re-render the search results
+if ( $context eq 'manage_add' ) {
+    $m->comp( '/Contacts/Partials/ManageContactSearch', q => $q );
+    $m->abort();
+}
+
+# Default: re-render the detail pane for the same user
+$m->comp( '/Contacts/Partials/ContactDetailPane', user_id => $user_id );
+$m->abort();
+</%INIT>

@@ -1,0 +1,215 @@
+<%ARGS>
+$Name         => ''
+$RealName     => ''
+$EmailAddress => ''
+$WorkPhone    => ''
+$MobilePhone  => ''
+$Organization => ''
+$Address1     => ''
+$Address2     => ''
+$City         => ''
+$State        => ''
+$Zip          => ''
+$Country      => ''
+$do_create    => 0
+</%ARGS>
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+unless ( $current_user && $current_user->id ) {
+    $r->status(403); $m->abort();
+}
+unless ( $current_user->HasRight( Right => 'AdminUsers', Object => RT->System ) ) {
+    $r->status(403); $m->abort();
+}
+
+my $web_path = RT->Config->Get('WebPath');
+my ( $created_user, $error );
+
+if ( $do_create ) {
+    unless ( $Name ) {
+        $error = loc('Login name is required.');
+    } else {
+        my $user = RT::User->new( RT->SystemUser );
+        my ( $ok, $msg ) = $user->Create(
+            Name         => $Name,
+            RealName     => $RealName,
+            EmailAddress => $EmailAddress,
+            WorkPhone    => $WorkPhone,
+            MobilePhone  => $MobilePhone,
+            Organization => $Organization,
+            Address1     => $Address1,
+            Address2     => $Address2,
+            City         => $City,
+            State        => $State,
+            Zip          => $Zip,
+            Country      => $Country,
+            Privileged   => 0,
+            Disabled     => 0,
+        );
+        if ( $ok ) {
+            if ( my $file_hash = _UploadedFile('UserImage') ) {
+                if ( length($file_hash->{LargeContent} // '') <= RT->Config->Get('MaxUserImageSize') ) {
+                    $user->SetImageAndContentType( $file_hash->{LargeContent}, $file_hash->{ContentType} );
+                }
+            }
+            if ( $current_user->HasRight( Right => 'ManagePersonalContacts', Object => RT->System ) ) {
+                RT::Extension::Contacts->AddPersonalContact( $user->Id, $current_user->id, '' );
+            }
+            $created_user = $user;
+        } else {
+            $error = $msg;
+        }
+    }
+}
+</%INIT>
+<div id="manage-search-results">
+% if ( $created_user ) {
+  <div class="p-3">
+    <div class="alert alert-success py-2 mb-3">
+      <i class="bi bi-check-circle me-1"></i>
+      <% loc('User "[_1]" created and added to personal contacts.', $created_user->RealName || $created_user->Name) %>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary"
+              hx-get="<% $web_path %>/Contacts/Partials/ManageContactSearch"
+              hx-target="#add-contact-results"
+              hx-select="#manage-search-results"
+              hx-swap="innerHTML">
+        <i class="bi bi-arrow-left me-1"></i><% loc('Back to search') %>
+      </button>
+      <a href="<% $web_path %>/Contacts/?user_id=<% $created_user->Id %>"
+         class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-person-vcard me-1"></i><% loc('View contact') %>
+      </a>
+    </div>
+  </div>
+% } else {
+  <form hx-post="<% $web_path %>/Contacts/Partials/ManageCreateUser"
+        hx-target="#add-contact-results"
+        hx-select="#manage-search-results"
+        hx-swap="innerHTML"
+        hx-encoding="multipart/form-data"
+        class="p-2">
+    <input type="hidden" name="do_create" value="1">
+
+%   if ( $error ) {
+    <div class="alert alert-danger py-2 mb-2 small"><% $error %></div>
+%   }
+
+    <p class="fw-semibold small text-muted mb-2 border-bottom pb-1"><% loc('Account') %></p>
+    <div class="row g-2 mb-2">
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Login name') %> <span class="text-danger">*</span></label>
+        <input type="text" name="Name" class="form-control form-control-sm"
+               value="<% $Name %>" required autocomplete="off">
+      </div>
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Real name') %></label>
+        <input type="text" name="RealName" class="form-control form-control-sm"
+               value="<% $RealName %>" autocomplete="off">
+      </div>
+    </div>
+    <div class="row g-2 mb-2">
+      <div class="col-8">
+        <label class="form-label form-label-sm mb-1"><% loc('Email') %></label>
+        <input type="email" name="EmailAddress" class="form-control form-control-sm"
+               value="<% $EmailAddress %>" autocomplete="off">
+      </div>
+      <div class="col-4">
+        <label class="form-label form-label-sm mb-1"><% loc('Organization') %></label>
+        <input type="text" name="Organization" class="form-control form-control-sm"
+               value="<% $Organization %>" autocomplete="off">
+      </div>
+    </div>
+
+    <p class="fw-semibold small text-muted mb-2 border-bottom pb-1 mt-3"><% loc('Contact') %></p>
+    <div class="row g-2 mb-2">
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Phone') %></label>
+        <input type="text" name="WorkPhone" class="form-control form-control-sm"
+               value="<% $WorkPhone %>" autocomplete="off">
+      </div>
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Mobile') %></label>
+        <input type="text" name="MobilePhone" class="form-control form-control-sm"
+               value="<% $MobilePhone %>" autocomplete="off">
+      </div>
+    </div>
+
+    <p class="fw-semibold small text-muted mb-2 border-bottom pb-1 mt-3"><% loc('Address') %></p>
+    <div class="row g-2 mb-2">
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Address 1') %></label>
+        <input type="text" name="Address1" class="form-control form-control-sm"
+               value="<% $Address1 %>" autocomplete="off">
+      </div>
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Address 2') %></label>
+        <input type="text" name="Address2" class="form-control form-control-sm"
+               value="<% $Address2 %>" autocomplete="off">
+      </div>
+    </div>
+    <div class="row g-2 mb-2">
+      <div class="col-4">
+        <label class="form-label form-label-sm mb-1"><% loc('ZIP') %></label>
+        <input type="text" name="Zip" class="form-control form-control-sm"
+               value="<% $Zip %>" autocomplete="off">
+      </div>
+      <div class="col-4">
+        <label class="form-label form-label-sm mb-1"><% loc('City') %></label>
+        <input type="text" name="City" class="form-control form-control-sm"
+               value="<% $City %>" autocomplete="off">
+      </div>
+      <div class="col-4">
+        <label class="form-label form-label-sm mb-1"><% loc('State') %></label>
+        <input type="text" name="State" class="form-control form-control-sm"
+               value="<% $State %>" autocomplete="off">
+      </div>
+    </div>
+    <div class="row g-2 mb-2">
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Country') %></label>
+        <input type="text" name="Country" class="form-control form-control-sm"
+               value="<% $Country %>" autocomplete="off">
+      </div>
+    </div>
+
+    <p class="fw-semibold small text-muted mb-2 border-bottom pb-1 mt-3"><% loc('Profile Photo') %></p>
+    <div class="row g-2 mb-2">
+      <div class="col-12">
+        <div class="d-flex align-items-center gap-3">
+          <img id="mcu-preview"
+               src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+               class="rounded-circle border"
+               style="width:56px;height:56px;object-fit:cover;display:none;">
+          <div class="flex-grow-1">
+            <input type="file" name="UserImage" id="mcu-image-input"
+                   class="form-control form-control-sm"
+                   accept="image/jpeg,image/png,image/gif,image/webp"
+                   onchange="
+                     var f=this.files[0];
+                     if(f){var r=new FileReader();r.onload=function(e){var p=document.getElementById('mcu-preview');p.src=e.target.result;p.style.display='block';};r.readAsDataURL(f);}
+                   ">
+            <div class="form-text"><% loc('Optional. JPEG, PNG or GIF.') %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+      <button type="submit" class="btn btn-sm btn-primary">
+        <i class="bi bi-person-plus me-1"></i><% loc('Create user') %>
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              hx-get="<% $web_path %>/Contacts/Partials/ManageContactSearch"
+              hx-target="#add-contact-results"
+              hx-select="#manage-search-results"
+              hx-swap="innerHTML">
+        <% loc('Cancel') %>
+      </button>
+    </div>
+  </form>
+% }
+</div>

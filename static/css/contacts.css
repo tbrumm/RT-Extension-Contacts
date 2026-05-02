@@ -1,0 +1,112 @@
+/* RT-Extension-Contacts */
+
+/* Full-height layout: fill remaining viewport below RT header */
+.contacts-page {
+    align-items: stretch;
+    height: 85vh;
+    max-height: 85vh;
+}
+
+.contacts-left-pane {
+    overflow-y: auto;
+    height: 100%;
+}
+
+.contacts-list-pane {
+    height: 100%;
+    display: flex !important;
+    flex-direction: column;
+}
+
+.contacts-list-pane .card-body {
+    flex: 1 1 0;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.contacts-detail-pane {
+    height: 100%;
+    display: flex !important;
+    flex-direction: column;
+}
+
+.contacts-detail-pane .card-body {
+    flex: 1 1 0;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.contacts-list-item:hover {
+    background-color: var(--bs-secondary-bg);
+}
+
+.contacts-list-item.active,
+.contacts-list-item:focus {
+    background-color: var(--bs-primary-bg-subtle);
+    outline: none;
+}
+
+.contacts-filter-link.active {
+    background-color: var(--bs-primary);
+    color: #fff !important;
+    border-color: var(--bs-primary);
+}
+
+.contact-avatar .rounded-circle {
+    background-color: var(--bs-secondary) !important;
+    user-select: none;
+}
+
+/* Use hue derived from first letter for avatar color variation */
+.contact-avatar-A { background: hsl(  0, 55%, 45%) !important; }
+.contact-avatar-B { background: hsl( 20, 55%, 45%) !important; }
+.contact-avatar-C { background: hsl( 40, 55%, 45%) !important; }
+.contact-avatar-D { background: hsl( 60, 55%, 45%) !important; }
+.contact-avatar-E { background: hsl( 80, 55%, 45%) !important; }
+.contact-avatar-F { background: hsl(100, 55%, 45%) !important; }
+.contact-avatar-G { background: hsl(120, 55%, 45%) !important; }
+.contact-avatar-H { background: hsl(140, 55%, 45%) !important; }
+.contact-avatar-I { background: hsl(160, 55%, 45%) !important; }
+.contact-avatar-J { background: hsl(180, 55%, 45%) !important; }
+.contact-avatar-K { background: hsl(200, 55%, 45%) !important; }
+.contact-avatar-L { background: hsl(220, 55%, 45%) !important; }
+.contact-avatar-M { background: hsl(240, 55%, 45%) !important; }
+.contact-avatar-N { background: hsl(260, 55%, 45%) !important; }
+.contact-avatar-O { background: hsl(280, 55%, 45%) !important; }
+.contact-avatar-P { background: hsl(300, 55%, 45%) !important; }
+.contact-avatar-Q { background: hsl(320, 55%, 45%) !important; }
+.contact-avatar-R { background: hsl(340, 55%, 45%) !important; }
+.contact-avatar-S { background: hsl(360, 55%, 45%) !important; }
+.contact-avatar-T { background: hsl( 15, 55%, 40%) !important; }
+.contact-avatar-U { background: hsl( 35, 55%, 40%) !important; }
+.contact-avatar-V { background: hsl( 55, 55%, 40%) !important; }
+.contact-avatar-W { background: hsl( 75, 55%, 40%) !important; }
+.contact-avatar-X { background: hsl( 95, 55%, 40%) !important; }
+.contact-avatar-Y { background: hsl(115, 55%, 40%) !important; }
+.contact-avatar-Z { background: hsl(135, 55%, 40%) !important; }
+
+.contacts-add-results .contact-card {
+    padding: .4rem .6rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.contacts-add-results .contact-card:last-child {
+    border-bottom: none;
+}
+
+/* Spinner overlay on HTMX requests */
+.htmx-indicator {
+    display: none;
+}
+.htmx-request .htmx-indicator {
+    display: inline-block;
+}
+
+/* Dark mode */
+[data-bs-theme=dark] .contacts-list-item:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+[data-bs-theme=dark] .contact-avatar .rounded-circle {
+    opacity: .85;
+}

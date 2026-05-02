@@ -1,0 +1,155 @@
+<& /Elements/Header, Title => loc('Manage Contacts') &>
+<& /Elements/Tabs &>
+
+<div class="row g-4 mt-1">
+
+  <!-- Personal Contacts -->
+  <div class="col-md-7">
+    <div class="card shadow-sm">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span class="fw-semibold">
+          <i class="bi bi-heart-fill text-danger me-2"></i><% loc('My Personal Contacts') %>
+        </span>
+        <span class="badge bg-secondary"><% scalar @personal_contacts %></span>
+      </div>
+      <div class="card-body p-0">
+% if (@personal_contacts) {
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th><% loc('Name') %></th>
+              <th><% loc('Email') %></th>
+              <th><% loc('Notes') %></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="personal-contacts-list">
+%   for my $c (@personal_contacts) {
+%     my $u = $c->{user};
+            <tr id="personal-row-<% $u->Id %>">
+              <td>
+                <a href="<% RT->Config->Get('WebPath') %>/User/Summary.html?id=<% $u->Id %>" target="_blank">
+                  <% $u->RealName || $u->Name %>
+                </a>
+              </td>
+              <td class="text-muted small"><% $u->EmailAddress %></td>
+              <td class="text-muted small"><% $c->{notes} %></td>
+              <td class="text-end">
+                <form hx-post="<% RT->Config->Get('WebPath') %>/Contacts/Partials/MarkContact"
+                      hx-target="#personal-row-<% $u->Id %>"
+                      hx-swap="outerHTML"
+                      class="d-inline">
+                  <input type="hidden" name="user_id"      value="<% $u->Id %>">
+                  <input type="hidden" name="marking_type" value="personal">
+                  <input type="hidden" name="action"       value="remove">
+                  <button class="btn btn-sm btn-outline-danger" title="<% loc('Remove') %>">
+                    <i class="bi bi-x-circle"></i>
+                  </button>
+                </form>
+                <a href="<% RT->Config->Get('WebPath') %>/Contacts/?contact=<% $u->Id %>"
+                   class="btn btn-sm btn-outline-primary ms-1" title="<% loc('View details') %>">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+%   }
+          </tbody>
+        </table>
+% } else {
+        <div class="text-center text-muted p-4">
+          <i class="bi bi-inbox" style="font-size:2rem;opacity:.4;"></i>
+          <p class="mt-2"><% loc('No personal contacts yet') %></p>
+        </div>
+% }
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Add contact + Group contacts -->
+  <div class="col-md-5">
+
+    <!-- Add personal contact -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-person-plus me-2"></i><% loc('Add Personal Contact') %>
+      </div>
+      <div class="card-body">
+        <div class="input-group input-group-sm mb-2">
+          <input type="text"
+                 id="add-contact-search"
+                 class="form-control"
+                 placeholder="<% loc('Search by name or email...') %>"
+                 hx-get="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ManageContactSearch"
+                 hx-trigger="keyup changed delay:400ms"
+                 hx-target="#add-contact-results"
+                 hx-select="#manage-search-results"
+                 hx-swap="innerHTML"
+                 name="q"
+                 autocomplete="off">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+        </div>
+        <div id="add-contact-results" class="contacts-add-results border rounded"></div>
+      </div>
+    </div>
+
+    <!-- Import/Export -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-arrow-left-right me-2"></i><% loc('Import / Export') %>
+      </div>
+      <div class="card-body">
+        <div class="d-flex gap-2 mb-3">
+          <a href="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ExportCSV?filter=personal"
+             class="btn btn-sm btn-outline-success">
+            <i class="bi bi-download me-1"></i><% loc('Export my contacts (CSV)') %>
+          </a>
+        </div>
+        <div id="import-result-pane">
+          <& /Contacts/Partials/ImportCSV &>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group contacts -->
+% if (@$user_groups) {
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-people me-2"></i><% loc('Group Contacts') %>
+      </div>
+      <div class="card-body">
+%   for my $g (@$user_groups) {
+        <div class="mb-3">
+          <div class="fw-semibold small mb-1"><% $g->{name} %></div>
+          <a href="<% RT->Config->Get('WebPath') %>/Contacts/?filter=group&group_id=<% $g->{id} %>"
+             class="btn btn-sm btn-outline-info">
+            <i class="bi bi-eye me-1"></i><% loc('View group contacts') %>
+          </a>
+        </div>
+%   }
+      </div>
+    </div>
+% }
+
+  </div>
+</div>
+
+<& /Elements/Footer &>
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+unless ( $current_user && $current_user->HasRight( Right => 'ManagePersonalContacts', Object => RT->System ) ) {
+    Abort( loc('Permission denied.') );
+}
+
+my $personal_rows = RT::Extension::Contacts->GetPersonalContacts( $current_user->id );
+my @personal_contacts;
+for my $row (@$personal_rows) {
+    my $u = RT::User->new( RT->SystemUser );
+    $u->Load( $row->{user_id} );
+    next unless $u->Id;
+    push @personal_contacts, { user => $u, notes => $row->{notes} };
+}
+
+my $user_groups = RT::Extension::Contacts->GetUserGroups( $current_user->id );
+</%INIT>

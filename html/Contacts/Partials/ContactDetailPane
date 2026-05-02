@@ -1,0 +1,260 @@
+<%ARGS>
+$user_id => 0
+</%ARGS>
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+unless ( $current_user && $current_user->id ) {
+    $r->status(403); $m->abort();
+}
+unless ( $current_user->HasRight( Right => 'SeeContacts', Object => RT->System ) ) {
+    $r->status(403); $m->abort();
+}
+
+my $user = RT::User->new( RT->SystemUser );
+$user->Load($user_id);
+unless ( $user->Id ) {
+    $m->out('<div class="text-muted p-3">' . loc('User not found') . '</div>');
+    $m->abort();
+}
+
+my $is_personal = RT::Extension::Contacts->IsPersonalContact( $user->Id, $current_user->id );
+my $markings    = RT::Extension::Contacts->GetContactMarkings( $user->Id, $current_user->id );
+my $tickets     = RT::Extension::Contacts->GetRecentTickets( $user->Id, 5 );
+my $assets      = RT::Extension::Contacts->GetRecentAssets(  $user->Id, 5 );
+my $articles    = RT::Extension::Contacts->GetRecentArticles( $user->Id, 5 );
+my $user_groups = RT::Extension::Contacts->GetUserGroups( $current_user->id );
+
+my @addr_lines;
+push @addr_lines, $user->Address1  if $user->Address1;
+push @addr_lines, $user->Address2  if $user->Address2;
+my $city_line = join(' ', grep { length($_//'') } $user->Zip//'', $user->City//'');
+push @addr_lines, $city_line       if $city_line;
+push @addr_lines, $user->Country   if $user->Country;
+
+my $can_manage = $current_user->HasRight( Right => 'ManagePersonalContacts', Object => RT->System );
+my $can_admin  = $current_user->HasRight( Right => 'AdminContacts',          Object => RT->System );
+
+my $web_path = RT->Config->Get('WebPath');
+</%INIT>
+<div id="contacts-detail-content">
+<div class="contact-detail p-3">
+
+  <!-- Header: Avatar + Name + Actions -->
+  <div class="d-flex align-items-start mb-3">
+    <img src="<% RT->Config->Get('WebPath') %>/Helpers/UserImage/<% $user->Id %>-<% $user->ImageSignature %>"
+         class="rounded-circle me-3 flex-shrink-0"
+         style="width:60px;height:60px;object-fit:cover;"
+         alt="<% uc(substr($user->RealName || $user->Name, 0, 1)) %>">
+    <div class="flex-grow-1">
+      <h5 class="mb-1"><% $user->RealName || $user->Name %></h5>
+      <div class="text-muted small"><% $user->EmailAddress %></div>
+% if ($user->Organization) {
+      <div class="text-muted small"><i class="bi bi-building me-1"></i><% $user->Organization %></div>
+% }
+    </div>
+    <div class="contact-action-btns d-flex gap-2">
+% if ($can_manage || $can_admin) {
+%   if ($is_personal) {
+      <form hx-post="<% $web_path %>/Contacts/Partials/MarkContact"
+            hx-target="#contacts-detail-pane" hx-select="#contacts-detail-content" hx-swap="innerHTML">
+        <input type="hidden" name="user_id"      value="<% $user->Id %>">
+        <input type="hidden" name="marking_type" value="personal">
+        <input type="hidden" name="action"       value="remove">
+        <button type="submit" class="btn btn-sm btn-success" title="<% loc('Remove personal contact') %>">
+          <i class="bi bi-heart-fill"></i>
+        </button>
+      </form>
+%   } else {
+      <form hx-post="<% $web_path %>/Contacts/Partials/MarkContact"
+            hx-target="#contacts-detail-pane" hx-select="#contacts-detail-content" hx-swap="innerHTML">
+        <input type="hidden" name="user_id"      value="<% $user->Id %>">
+        <input type="hidden" name="marking_type" value="personal">
+        <input type="hidden" name="action"       value="add">
+        <button type="submit" class="btn btn-sm btn-outline-success" title="<% loc('Add as personal contact') %>">
+          <i class="bi bi-heart"></i>
+        </button>
+      </form>
+%   }
+% }
+% if ($can_admin) {
+      <button class="btn btn-sm btn-outline-secondary" title="<% loc('Edit user') %>"
+              hx-get="<% $web_path %>/Contacts/Partials/ContactEditPane?user_id=<% $user->Id %>"
+              hx-target="#contacts-detail-pane"
+              hx-select="#contacts-detail-content"
+              hx-swap="innerHTML">
+        <i class="bi bi-pencil"></i>
+      </button>
+% }
+      <a href="<% $web_path %>/Ticket/Create.html?Requestors=<% $user->EmailAddress %>"
+         class="btn btn-sm btn-outline-warning" title="<% loc('Create ticket for this contact') %>" target="_blank">
+        <i class="bi bi-ticket-perforated-fill"></i>
+      </a>
+      <a href="<% $web_path %>/User/Summary.html?id=<% $user->Id %>"
+         class="btn btn-sm btn-outline-primary" title="<% loc('View user profile') %>" target="_blank">
+        <i class="bi bi-box-arrow-up-right"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- Contact info table -->
+  <table class="table table-sm table-borderless mb-3">
+% if ($user->WorkPhone) {
+    <tr><th class="text-muted" style="width:35%"><i class="bi bi-telephone me-1"></i><% loc('Phone') %></th>
+        <td><% $user->WorkPhone %></td></tr>
+% }
+% if ($user->MobilePhone) {
+    <tr><th class="text-muted"><i class="bi bi-phone me-1"></i><% loc('Mobile') %></th>
+        <td><% $user->MobilePhone %></td></tr>
+% }
+% if ($user->Organization) {
+    <tr><th class="text-muted"><i class="bi bi-building me-1"></i><% loc('Organization') %></th>
+        <td><% $user->Organization %></td></tr>
+% }
+% if (@addr_lines) {
+    <tr><th class="text-muted"><i class="bi bi-geo-alt me-1"></i><% loc('Address') %></th>
+        <td><address class="mb-0" style="font-style:normal;">
+%   for my $line (@addr_lines) {
+          <% $line %><br>
+%   }
+        </address></td></tr>
+% }
+    <tr><th class="text-muted"><i class="bi bi-person-check me-1"></i><% loc('RT Login') %></th>
+        <td><% $user->Name %></td></tr>
+    <tr><th class="text-muted"><i class="bi bi-toggle-on me-1"></i><% loc('Status') %></th>
+        <td>
+% if ($user->Disabled) {
+          <span class="badge bg-danger"><% loc('Disabled') %></span>
+% } else {
+          <span class="badge bg-success"><% loc('Active') %></span>
+% }
+        </td></tr>
+  </table>
+
+  <!-- Contact Markings -->
+% if (@$markings) {
+  <h6 class="border-bottom pb-1 mb-2"><i class="bi bi-tags me-1"></i><% loc('Contact Markings') %></h6>
+  <div class="mb-3 d-flex flex-wrap gap-2">
+%   for my $marking (@$markings) {
+%     if ($marking->{marking_type} eq 'personal') {
+    <span class="badge bg-success">
+      <i class="bi bi-heart-fill me-1"></i><% loc('Personal') %> (<% $marking->{marked_by_name} %>)
+    </span>
+%     } elsif ($marking->{marking_type} eq 'group') {
+    <span class="badge bg-info text-dark">
+      <i class="bi bi-people-fill me-1"></i><% $marking->{group_name} || loc('Group') %>
+    </span>
+%     }
+%   }
+  </div>
+% }
+
+  <!-- Group contacts management -->
+% if ( ($can_manage || $can_admin) && @$user_groups ) {
+  <h6 class="border-bottom pb-1 mb-2"><i class="bi bi-people me-1"></i><% loc('Group Contact') %></h6>
+  <div class="d-flex flex-wrap gap-2 mb-3">
+%   for my $g (@$user_groups) {
+%     my $is_gc = RT::Extension::Contacts->IsGroupContact( $user->Id, $g->{id} );
+%     if ($is_gc) {
+    <form hx-post="<% $web_path %>/Contacts/Partials/MarkContact"
+          hx-target="#contacts-detail-pane" hx-select="#contacts-detail-content" hx-swap="innerHTML" class="d-inline">
+      <input type="hidden" name="user_id"      value="<% $user->Id %>">
+      <input type="hidden" name="marking_type" value="group">
+      <input type="hidden" name="group_id"     value="<% $g->{id} %>">
+      <input type="hidden" name="action"       value="remove">
+      <button class="btn btn-sm btn-info text-dark">
+        <i class="bi bi-people-fill me-1"></i><% $g->{name} %> <i class="bi bi-x-circle ms-1"></i>
+      </button>
+    </form>
+%     } else {
+    <form hx-post="<% $web_path %>/Contacts/Partials/MarkContact"
+          hx-target="#contacts-detail-pane" hx-select="#contacts-detail-content" hx-swap="innerHTML" class="d-inline">
+      <input type="hidden" name="user_id"      value="<% $user->Id %>">
+      <input type="hidden" name="marking_type" value="group">
+      <input type="hidden" name="group_id"     value="<% $g->{id} %>">
+      <input type="hidden" name="action"       value="add">
+      <button class="btn btn-sm btn-outline-info">
+        <i class="bi bi-people me-1"></i><% $g->{name} %> <i class="bi bi-plus-circle ms-1"></i>
+      </button>
+    </form>
+%     }
+%   }
+  </div>
+% }
+
+  <!-- Notes (personal) -->
+% if ($can_manage || $can_admin) {
+  <h6 class="border-bottom pb-1 mb-2"><i class="bi bi-journal-text me-1"></i><% loc('Personal Notes') %></h6>
+  <form hx-post="<% $web_path %>/Contacts/Partials/MarkContact"
+        hx-target="#contacts-detail-pane" hx-select="#contacts-detail-content" hx-swap="innerHTML" class="mb-3">
+    <input type="hidden" name="user_id"      value="<% $user->Id %>">
+    <input type="hidden" name="marking_type" value="personal">
+    <input type="hidden" name="action"       value="notes">
+    <textarea class="form-control form-control-sm mb-2" name="notes" rows="2"
+              placeholder="<% loc('Personal notes about this contact...') %>"><% do { my $n = (grep { $_->{marking_type} eq 'personal' && $_->{marked_by} == $current_user->id } @$markings)[0]; $n ? $n->{notes} : '' } %></textarea>
+    <button type="submit" class="btn btn-sm btn-outline-secondary"><% loc('Save Notes') %></button>
+  </form>
+% }
+
+  <!-- Recent Tickets -->
+% if (@$tickets) {
+  <h6 class="border-bottom pb-1 mb-2"><i class="bi bi-ticket-perforated me-1"></i><% loc('Recent Tickets') %></h6>
+  <div class="list-group list-group-flush">
+%   for my $t (@$tickets) {
+    <a href="<% $web_path %>/Ticket/Display.html?id=<% $t->{id} %>"
+       class="list-group-item list-group-item-action px-0 py-1" target="_blank">
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-secondary" style="font-size:.7rem;">#<% $t->{id} %></span>
+        <span class="text-truncate" style="font-size:.85rem;"><% $t->{subject} %></span>
+        <span class="badge ms-auto" style="font-size:.65rem;background:var(--bs-secondary);">
+          <% $t->{status} %>
+        </span>
+      </div>
+    </a>
+%   }
+  </div>
+% } else {
+  <div class="text-muted small"><i class="bi bi-info-circle me-1"></i><% loc('No tickets found for this contact') %></div>
+% }
+
+  <!-- Recent Assets -->
+% if (@$assets) {
+  <h6 class="border-bottom pb-1 mb-2 mt-3"><i class="bi bi-box-seam me-1"></i><% loc('Held Assets') %></h6>
+  <div class="list-group list-group-flush">
+%   for my $a (@$assets) {
+    <a href="<% $web_path %>/Asset/Display.html?id=<% $a->{id} %>"
+       class="list-group-item list-group-item-action px-0 py-1" target="_blank">
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-info text-dark" style="font-size:.7rem;">#<% $a->{id} %></span>
+        <span class="text-truncate" style="font-size:.85rem;"><% $a->{name} %></span>
+        <span class="badge ms-auto" style="font-size:.65rem;background:var(--bs-secondary);">
+          <% $a->{status} %>
+        </span>
+      </div>
+    </a>
+%   }
+  </div>
+% }
+
+  <!-- Recent Articles -->
+% if (@$articles) {
+  <h6 class="border-bottom pb-1 mb-2 mt-3"><i class="bi bi-journal-text me-1"></i><% loc('Updated Articles') %></h6>
+  <div class="list-group list-group-flush">
+%   for my $a (@$articles) {
+    <a href="<% $web_path %>/Articles/Article/Display.html?id=<% $a->{id} %>"
+       class="list-group-item list-group-item-action px-0 py-1" target="_blank">
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-warning text-dark" style="font-size:.7rem;">#<% $a->{id} %></span>
+        <span class="text-truncate" style="font-size:.85rem;"><% $a->{name} %></span>
+        <span class="badge ms-auto" style="font-size:.65rem;background:var(--bs-secondary);">
+          <% $a->{class} %>
+        </span>
+      </div>
+    </a>
+%   }
+  </div>
+% }
+
+</div><!-- /contact-detail -->
+</div><!-- /contacts-detail-content -->

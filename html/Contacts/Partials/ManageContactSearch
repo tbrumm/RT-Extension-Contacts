@@ -1,0 +1,78 @@
+<%ARGS>
+$q => ''
+</%ARGS>
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+unless ( $current_user && $current_user->id ) {
+    $r->status(403); $m->abort();
+}
+unless ( $current_user->HasRight( Right => 'ManagePersonalContacts', Object => RT->System )
+      || $current_user->HasRight( Right => 'AdminContacts',          Object => RT->System ) ) {
+    $r->status(403); $m->abort();
+}
+
+my @contacts;
+if ( length $q ) {
+    my $users = RT::Extension::Contacts->SearchUsers( $q, 20 );
+    while ( my $u = $users->Next ) {
+        my $is_personal = RT::Extension::Contacts->IsPersonalContact( $u->Id, $current_user->id );
+        push @contacts, { user => $u, is_personal => $is_personal };
+    }
+}
+
+my $web_path  = RT->Config->Get('WebPath');
+my $can_admin_users = $current_user->HasRight( Right => 'AdminUsers', Object => RT->System );
+</%INIT>
+<div id="manage-search-results">
+% if ( !length $q ) {
+<div class="text-muted small p-2 text-center"><% loc('Type to search for contacts...') %></div>
+% } elsif ( !@contacts ) {
+<div class="p-3 text-center">
+  <i class="bi bi-inbox" style="font-size:1.8rem; opacity:.4;"></i>
+  <p class="mt-1 small text-muted"><% loc('No user found for "[_1]"', $q) %></p>
+% if ($can_admin_users) {
+  <button class="btn btn-sm btn-outline-primary"
+          hx-get="<% $web_path %>/Contacts/Partials/ManageCreateUser"
+          hx-target="#add-contact-results"
+          hx-select="#manage-search-results"
+          hx-swap="innerHTML">
+    <i class="bi bi-person-plus me-1"></i><% loc('Create new user') %>
+  </button>
+% }
+</div>
+% } else {
+%   for my $c (@contacts) {
+%     my $u = $c->{user};
+<div class="contact-card d-flex align-items-center px-2 py-2 border-bottom">
+  <img src="<% $web_path %>/Helpers/UserImage/<% $u->Id %>-<% $u->ImageSignature %>"
+       class="rounded-circle me-2 flex-shrink-0"
+       style="width:32px;height:32px;object-fit:cover;" alt="">
+  <div class="flex-grow-1 overflow-hidden">
+    <div class="fw-semibold text-truncate" style="font-size:.85rem;"><% $u->RealName || $u->Name %></div>
+    <div class="text-muted text-truncate" style="font-size:.78rem;"><% $u->EmailAddress %></div>
+  </div>
+  <div class="ms-2 flex-shrink-0">
+%   if ( $c->{is_personal} ) {
+    <span class="badge bg-success"><i class="bi bi-heart-fill me-1"></i><% loc('Added') %></span>
+%   } else {
+    <form hx-post="<% $web_path %>/Contacts/Partials/MarkContact"
+          hx-target="#add-contact-results"
+          hx-select="#manage-search-results"
+          hx-swap="innerHTML" class="d-inline">
+      <input type="hidden" name="user_id"      value="<% $u->Id %>">
+      <input type="hidden" name="marking_type" value="personal">
+      <input type="hidden" name="action"       value="add">
+      <input type="hidden" name="context"      value="manage_add">
+      <input type="hidden" name="q"            value="<% $q %>">
+      <button class="btn btn-sm btn-outline-success" title="<% loc('Add as personal contact') %>">
+        <i class="bi bi-person-plus"></i>
+      </button>
+    </form>
+%   }
+  </div>
+</div>
+%   }
+% }
+</div>

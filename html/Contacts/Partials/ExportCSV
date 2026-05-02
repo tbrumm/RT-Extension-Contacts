@@ -1,0 +1,71 @@
+<%ARGS>
+$filter   => 'all'
+$group_id => 0
+</%ARGS>
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+unless ( $current_user && $current_user->id ) {
+    $r->status(403); $m->abort();
+}
+unless ( $current_user->HasRight( Right => 'SeeContacts', Object => RT->System ) ) {
+    $r->status(403); $m->abort();
+}
+
+my @rows;
+
+if ( $filter eq 'personal' ) {
+    my $markings = RT::Extension::Contacts->GetPersonalContacts( $current_user->id );
+    for my $cm (@$markings) {
+        my $u = RT::User->new( RT->SystemUser );
+        $u->Load( $cm->{user_id} );
+        next unless $u->Id;
+        push @rows, {
+            id           => $u->Id,
+            name         => $u->Name,
+            email        => $u->EmailAddress,
+            realname     => $u->RealName,
+            organization => $u->Organization,
+            phone        => $u->WorkPhone,
+            mobile       => $u->MobilePhone,
+            marking_type => 'personal',
+            group        => '',
+            notes        => $cm->{notes},
+        };
+    }
+} else {
+    my $users = RT::Extension::Contacts->GetAllContacts(5000, 0);
+    while ( my $u = $users->Next ) {
+        push @rows, {
+            id           => $u->Id,
+            name         => $u->Name,
+            email        => $u->EmailAddress,
+            realname     => $u->RealName,
+            organization => $u->Organization,
+            phone        => $u->WorkPhone,
+            mobile       => $u->MobilePhone,
+            marking_type => '',
+            group        => '',
+            notes        => '',
+        };
+    }
+}
+
+$r->content_type('text/csv; charset=UTF-8');
+$r->headers_out->set('Content-Disposition', 'attachment; filename="contacts-export.csv"');
+$m->clear_buffer();
+
+$m->out("id,name,email,realname,organization,phone,mobile,marking_type,group,notes\n");
+for my $row (@rows) {
+    $m->out( join(',', map { _csv($_) } @{$row}{qw(id name email realname organization phone mobile marking_type group notes)} ) . "\n" );
+}
+
+$m->abort();
+
+sub _csv {
+    my $v = shift // '';
+    $v =~ s/"/""/g;
+    return qq{"$v"};
+}
+</%INIT>

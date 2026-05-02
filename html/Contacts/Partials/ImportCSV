@@ -1,0 +1,89 @@
+<%ARGS>
+$csv_file => undef
+</%ARGS>
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+unless ( $current_user && $current_user->id ) {
+    $r->status(403); $m->abort();
+}
+unless ( $current_user->HasRight( Right => 'ManagePersonalContacts', Object => RT->System )
+      || $current_user->HasRight( Right => 'AdminContacts',          Object => RT->System ) ) {
+    $r->status(403); $m->abort();
+}
+
+my ( $imported, $skipped, @errors );
+
+if ( $ENV{REQUEST_METHOD} eq 'POST' && $csv_file ) {
+
+    my $fh = $csv_file;
+    my @lines = <$fh>;
+    shift @lines; # skip header
+
+    for my $line (@lines) {
+        chomp $line;
+        $line =~ s/\r$//;
+        next unless $line;
+        my @fields = _parse_csv_line($line);
+        # Expected: id,name,email,realname,organization,phone,mobile,marking_type,group,notes
+        my $email        = $fields[2] // '';
+        my $marking_type = $fields[7] // 'personal';
+        my $notes        = $fields[9] // '';
+
+        next unless $email;
+        my $u = RT::User->new( RT->SystemUser );
+        $u->LoadByEmail($email);
+        unless ( $u->Id ) {
+            push @errors, "User not found: $email";
+            $skipped++;
+            next;
+        }
+
+        my ( $ok, $err ) = RT::Extension::Contacts->AddPersonalContact( $u->Id, $current_user->id, $notes );
+        if ($ok) { $imported++ }
+        else     { push @errors, "Failed for $email: $err"; $skipped++ }
+    }
+}
+
+sub _parse_csv_line {
+    my $line = shift;
+    my @fields;
+    while ($line =~ /("(?:[^"]|"")*"|[^,]*),?/g) {
+        my $f = $1;
+        $f =~ s/^"(.*)"$/$1/s;
+        $f =~ s/""/"/g;
+        push @fields, $f;
+        last if pos($line) >= length($line);
+    }
+    return @fields;
+}
+</%INIT>
+% if ( $ENV{REQUEST_METHOD} eq 'POST' && defined $imported ) {
+<div class="alert alert-<% @errors ? 'warning' : 'success' %> py-2">
+  <strong><% loc('[_1] contacts imported', $imported // 0) %></strong>
+  <% $skipped ? loc(', [_1] skipped', $skipped) : '' %>
+% if (@errors) {
+  <ul class="mt-2 mb-0 small">
+%   for my $e (@errors) {
+    <li><% $e %></li>
+%   }
+  </ul>
+% }
+</div>
+% } else {
+<form hx-post="<% RT->Config->Get('WebPath') %>/Contacts/Partials/ImportCSV"
+      hx-target="#import-result-pane"
+      hx-encoding="multipart/form-data">
+  <div class="mb-3">
+    <label class="form-label small fw-semibold"><% loc('CSV File') %></label>
+    <input type="file" class="form-control form-control-sm" name="csv_file" accept=".csv">
+    <div class="form-text">
+      <% loc('Columns: id, name, email, realname, organization, phone, mobile, marking_type, group, notes') %>
+    </div>
+  </div>
+  <button type="submit" class="btn btn-sm btn-primary">
+    <i class="bi bi-upload me-1"></i><% loc('Import') %>
+  </button>
+</form>
+% }

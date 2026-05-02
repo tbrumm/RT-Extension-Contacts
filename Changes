@@ -1,0 +1,16 @@
+1.0.0 2026-05-02
+    - Initial release
+    - Three-column contacts page (Tools menu) with live HTMX search and filters
+    - Personal contact markings with private notes
+    - Group contact markings per RT group
+    - Contact detail pane: profile photo, address, phone, recent tickets, held assets, updated articles
+    - Inline user creation with all fields and photo upload (requires AdminUsers right)
+    - Inline user editing directly in the detail pane
+    - Create ticket button pre-fills requestor from selected contact
+    - Manage Contacts page (user menu): list, search, add, remove, import, export
+    - CSV export (personal contacts or all contacts) and CSV import
+    - Contact markings stored in new contact_markings table (auto-created)
+    - Permissions: SeeContacts, ManagePersonalContacts, ManageGroupContacts, AdminContacts
+    - Bootstrap 5.3 / dark-mode aware via var(--bs-*) CSS variables
+    - HTMX fragment pattern with hx-select (no inherit=>undef, session intact)
+    - Profile photos via RT's native /Helpers/UserImage/ endpoint

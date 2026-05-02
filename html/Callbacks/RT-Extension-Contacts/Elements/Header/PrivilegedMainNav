@@ -1,0 +1,30 @@
+<%INIT>
+my $top = Menu();
+return unless $top;
+
+my $current_user = $session{CurrentUser};
+return unless $current_user && $current_user->id;
+return unless $current_user->HasRight( Right => 'SeeContacts', Object => RT->System );
+
+# Add "Contacts" under the Tools menu
+my $tools = $top->child('tools');
+if ($tools) {
+    $tools->child(
+        'contacts',
+        title      => loc('Contacts'),
+        path       => RT->Config->Get('WebPath') . '/Contacts/',
+        sort_order => 90,
+    );
+}
+
+# Add "Manage Contacts" under the user dropdown (preferences)
+my $prefs = $top->child('preferences');
+if ($prefs) {
+    $prefs->child(
+        'manage_contacts',
+        title      => loc('Manage Contacts'),
+        path       => RT->Config->Get('WebPath') . '/Contacts/Manage.html',
+        sort_order => 50,
+    );
+}
+</%INIT>

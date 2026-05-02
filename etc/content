@@ -1,0 +1,14 @@
+our @ACL = (
+    {
+        Right       => 'SeeContacts',
+        GroupDomain => 'SystemInternal',
+        GroupType   => 'Privileged',
+    },
+    {
+        Right       => 'ManagePersonalContacts',
+        GroupDomain => 'SystemInternal',
+        GroupType   => 'Privileged',
+    },
+);
+
+1;

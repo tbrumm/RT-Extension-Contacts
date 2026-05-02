@@ -1,0 +1,234 @@
+<%ARGS>
+$user_id  => 0
+$do_save  => 0
+$Name         => ''
+$RealName     => ''
+$EmailAddress => ''
+$WorkPhone    => ''
+$MobilePhone  => ''
+$Organization => ''
+$Address1     => ''
+$Address2     => ''
+$City         => ''
+$State        => ''
+$Zip          => ''
+$Country      => ''
+</%ARGS>
+<%INIT>
+use RT::Extension::Contacts;
+
+my $current_user = $session{CurrentUser};
+unless ( $current_user && $current_user->id ) {
+    $r->status(403); $m->abort();
+}
+unless ( $current_user->HasRight( Right => 'AdminUsers', Object => RT->System ) ) {
+    $r->status(403); $m->abort();
+}
+
+my $user = RT::User->new( RT->SystemUser );
+$user->Load($user_id);
+unless ( $user->Id ) {
+    $m->out('<div class="text-muted p-3">' . loc('User not found') . '</div>');
+    $m->abort();
+}
+
+my $web_path = RT->Config->Get('WebPath');
+my $error;
+
+if ( $do_save ) {
+    my @fields = (
+        RealName     => $RealName,
+        EmailAddress => $EmailAddress,
+        WorkPhone    => $WorkPhone,
+        MobilePhone  => $MobilePhone,
+        Organization => $Organization,
+        Address1     => $Address1,
+        Address2     => $Address2,
+        City         => $City,
+        State        => $State,
+        Zip          => $Zip,
+        Country      => $Country,
+    );
+    my $ok = 1;
+    while ( my ( $field, $val ) = splice @fields, 0, 2 ) {
+        my $method = "Set$field";
+        my ( $ret, $msg ) = $user->$method($val);
+        unless ( $ret ) { $error = $msg; $ok = 0; last; }
+    }
+
+    if ( $ok ) {
+        if ( my $file_hash = _UploadedFile('UserImage') ) {
+            if ( length($file_hash->{LargeContent} // '') <= RT->Config->Get('MaxUserImageSize') ) {
+                $user->SetImageAndContentType( $file_hash->{LargeContent}, $file_hash->{ContentType} );
+            }
+        }
+        # Re-render the detail pane on success
+        $m->comp( '/Contacts/Partials/ContactDetailPane', user_id => $user_id );
+        $m->abort();
+    }
+    # On error: fall through and re-render form with error + submitted values
+}
+
+# Pre-fill from user object when loading (GET) or on save error
+$Name         ||= $user->Name;
+$RealName     ||= $user->RealName     // '';
+$EmailAddress ||= $user->EmailAddress // '';
+$WorkPhone    ||= $user->WorkPhone    // '';
+$MobilePhone  ||= $user->MobilePhone  // '';
+$Organization ||= $user->Organization // '';
+$Address1     ||= $user->Address1     // '';
+$Address2     ||= $user->Address2     // '';
+$City         ||= $user->City         // '';
+$State        ||= $user->State        // '';
+$Zip          ||= $user->Zip          // '';
+$Country      ||= $user->Country      // '';
+</%INIT>
+<div id="contacts-detail-content">
+<div class="contact-detail p-3">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center mb-3">
+    <img src="<% $web_path %>/Helpers/UserImage/<% $user->Id %>-<% $user->ImageSignature %>"
+         class="rounded-circle me-3 flex-shrink-0"
+         style="width:52px;height:52px;object-fit:cover;" alt="">
+    <div>
+      <h5 class="mb-0"><% $user->RealName || $user->Name %></h5>
+      <div class="text-muted small"><% loc('Edit contact') %></div>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary ms-auto"
+            hx-get="<% $web_path %>/Contacts/Partials/ContactDetailPane?user_id=<% $user_id %>"
+            hx-target="#contacts-detail-pane"
+            hx-select="#contacts-detail-content"
+            hx-swap="innerHTML"
+            title="<% loc('Cancel') %>">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+
+  <form hx-post="<% $web_path %>/Contacts/Partials/ContactEditPane"
+        hx-target="#contacts-detail-pane"
+        hx-select="#contacts-detail-content"
+        hx-swap="innerHTML"
+        hx-encoding="multipart/form-data">
+    <input type="hidden" name="user_id"  value="<% $user_id %>">
+    <input type="hidden" name="do_save"  value="1">
+
+%   if ( $error ) {
+    <div class="alert alert-danger py-2 mb-3 small"><% $error %></div>
+%   }
+
+    <!-- Account -->
+    <p class="fw-semibold small text-muted mb-2 border-bottom pb-1"><% loc('Account') %></p>
+    <div class="row g-2 mb-2">
+      <div class="col-5">
+        <label class="form-label form-label-sm mb-1"><% loc('Login name') %></label>
+        <input type="text" class="form-control form-control-sm bg-body-secondary"
+               value="<% $Name %>" disabled>
+      </div>
+      <div class="col-7">
+        <label class="form-label form-label-sm mb-1"><% loc('Real name') %></label>
+        <input type="text" name="RealName" class="form-control form-control-sm"
+               value="<% $RealName %>">
+      </div>
+    </div>
+    <div class="row g-2 mb-2">
+      <div class="col-8">
+        <label class="form-label form-label-sm mb-1"><% loc('Email') %></label>
+        <input type="email" name="EmailAddress" class="form-control form-control-sm"
+               value="<% $EmailAddress %>">
+      </div>
+      <div class="col-4">
+        <label class="form-label form-label-sm mb-1"><% loc('Organization') %></label>
+        <input type="text" name="Organization" class="form-control form-control-sm"
+               value="<% $Organization %>">
+      </div>
+    </div>
+
+    <!-- Contact -->
+    <p class="fw-semibold small text-muted mb-2 border-bottom pb-1 mt-3"><% loc('Contact') %></p>
+    <div class="row g-2 mb-2">
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Phone') %></label>
+        <input type="text" name="WorkPhone" class="form-control form-control-sm"
+               value="<% $WorkPhone %>">
+      </div>
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Mobile') %></label>
+        <input type="text" name="MobilePhone" class="form-control form-control-sm"
+               value="<% $MobilePhone %>">
+      </div>
+    </div>
+
+    <!-- Address -->
+    <p class="fw-semibold small text-muted mb-2 border-bottom pb-1 mt-3"><% loc('Address') %></p>
+    <div class="row g-2 mb-2">
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Address 1') %></label>
+        <input type="text" name="Address1" class="form-control form-control-sm"
+               value="<% $Address1 %>">
+      </div>
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Address 2') %></label>
+        <input type="text" name="Address2" class="form-control form-control-sm"
+               value="<% $Address2 %>">
+      </div>
+    </div>
+    <div class="row g-2 mb-2">
+      <div class="col-3">
+        <label class="form-label form-label-sm mb-1"><% loc('ZIP') %></label>
+        <input type="text" name="Zip" class="form-control form-control-sm"
+               value="<% $Zip %>">
+      </div>
+      <div class="col-5">
+        <label class="form-label form-label-sm mb-1"><% loc('City') %></label>
+        <input type="text" name="City" class="form-control form-control-sm"
+               value="<% $City %>">
+      </div>
+      <div class="col-4">
+        <label class="form-label form-label-sm mb-1"><% loc('State') %></label>
+        <input type="text" name="State" class="form-control form-control-sm"
+               value="<% $State %>">
+      </div>
+    </div>
+    <div class="row g-2 mb-2">
+      <div class="col-6">
+        <label class="form-label form-label-sm mb-1"><% loc('Country') %></label>
+        <input type="text" name="Country" class="form-control form-control-sm"
+               value="<% $Country %>">
+      </div>
+    </div>
+
+    <!-- Profile Photo -->
+    <p class="fw-semibold small text-muted mb-2 border-bottom pb-1 mt-3"><% loc('Profile Photo') %></p>
+    <div class="d-flex align-items-center gap-3 mb-2">
+      <img id="cep-preview"
+           src="<% $web_path %>/Helpers/UserImage/<% $user->Id %>-<% $user->ImageSignature %>"
+           class="rounded-circle border"
+           style="width:56px;height:56px;object-fit:cover;">
+      <div class="flex-grow-1">
+        <input type="file" name="UserImage" class="form-control form-control-sm"
+               accept="image/jpeg,image/png,image/gif,image/webp"
+               onchange="
+                 var f=this.files[0];
+                 if(f){var r=new FileReader();r.onload=function(e){document.getElementById('cep-preview').src=e.target.result;};r.readAsDataURL(f);}
+               ">
+        <div class="form-text"><% loc('Leave empty to keep current photo.') %></div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+      <button type="submit" class="btn btn-sm btn-primary">
+        <i class="bi bi-floppy me-1"></i><% loc('Save') %>
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              hx-get="<% $web_path %>/Contacts/Partials/ContactDetailPane?user_id=<% $user_id %>"
+              hx-target="#contacts-detail-pane"
+              hx-select="#contacts-detail-content"
+              hx-swap="innerHTML">
+        <% loc('Cancel') %>
+      </button>
+    </div>
+  </form>
+
+</div><!-- /contact-detail -->
+</div><!-- /contacts-detail-content -->
