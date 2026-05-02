@@ -14,7 +14,21 @@
 %   my $u = RT::User->new(RT->SystemUser);
 %   $u->Load($c->{user_id});
 %   next unless $u->Id;
-%   my $img = $web_path . '/Helpers/UserImage/' . $u->Id . '-' . $u->ImageSignature;
+%   my $has_rt_image = $u->ImageContentType ? 1 : 0;
+%   my $email_hash   = md5_hex(lc($u->EmailAddress // ''));
+%   my $gravatar_url = "https://www.gravatar.com/avatar/${email_hash}?s=56&d=404";
+%   my $dname        = $u->RealName || $u->Name || '';
+%   my @nw = split /\s+/, $dname;
+%   my $initials = '';
+%   $initials .= uc(substr($nw[0],  0, 1)) if @nw >= 1;
+%   $initials .= uc(substr($nw[-1], 0, 1)) if @nw >= 2;
+%   $initials ||= '?';
+%   my $hue = 0; $hue = ($hue * 31 + ord($_)) % 360 for split //, $dname;
+%   my $avatar_color = "hsl($hue,55%,45%)";
+%   my $avatar_src   = $has_rt_image
+%       ? $web_path . '/Helpers/UserImage/' . $u->Id . '-' . $u->ImageSignature
+%       : $gravatar_url;
+%   my $avatar_step  = $has_rt_image ? 'rt' : 'gravatar';
 %   my @meta;
 %   push @meta, $u->Organization if $u->Organization;
 %   push @meta, $u->WorkPhone    if $u->WorkPhone;
@@ -23,8 +37,15 @@
 %   push @meta, join(', ', @aparts) if @aparts;
   <div class="list-group-item px-3 py-1">
     <div class="d-flex align-items-center gap-2">
-      <img src="<% $img |h %>" class="rounded-circle flex-shrink-0"
-           style="width:28px;height:28px;object-fit:cover;" alt="">
+      <img src="<% $avatar_src |h %>"
+           data-gravatar="<% $gravatar_url |h %>"
+           data-initials="<% $initials |h %>"
+           data-color="<% $avatar_color |h %>"
+           data-step="<% $avatar_step %>"
+           data-size="28"
+           onerror="contactAvatarFallback(this)"
+           class="rounded-circle flex-shrink-0"
+           style="width:28px;height:28px;object-fit:cover;" alt="<% $initials |h %>">
       <div class="flex-grow-1 overflow-hidden">
         <div class="d-flex align-items-baseline justify-content-between gap-2">
           <a href="<% $web_path %>/Contacts/?user_id=<% $u->Id %>" class="fw-semibold text-body text-decoration-none text-truncate"
@@ -63,6 +84,7 @@
 
 <%INIT>
 use RT::Extension::Contacts;
+use Digest::MD5 qw(md5_hex);
 
 my $current_user = $session{CurrentUser};
 my $can_see = $current_user->HasRight(Right => 'SeeContacts', Object => RT->System);
