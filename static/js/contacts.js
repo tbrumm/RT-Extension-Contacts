@@ -56,7 +56,8 @@
     };
 
     // Re-run after HTMX swaps new content
-    document.body.addEventListener('htmx:afterSwap', function () {
+    // Use document instead of document.body — body is null when <head> scripts run
+    document.addEventListener('htmx:afterSwap', function () {
         colorizeAvatars();
         bindListItemClick();
     });
